@@ -12,8 +12,10 @@ import GameMap from '@/components/game/GameMap.vue'
 import GameChat from '@/components/game/GameChat.vue'
 import CreateTokenModal from '@/components/game/CreateTokenModal.vue'
 import CreateCharacterModal from '@/components/game/CreateCharacterModal.vue'
+import CreateVehicleModal from '@/components/game/CreateVehicleModal.vue'
 import CharactersList from '@/components/game/CharactersList.vue'
 import CharacterSheet from '@/components/game/CharacterSheet.vue'
+import VehicleSheet from '@/components/game/VehicleSheet.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,17 +35,14 @@ const mapType = ref('global')
 // Модальные окна
 const showCreateTokenModal = ref(false)
 const showCreateCharacterModal = ref(false)
+const showCreateVehicleModal = ref(false)
 const showCharactersList = ref(false)
 const showCharacterSheet = ref(false)
+const showVehicleSheet = ref(false)
 const selectedCharacter = ref(null)
-const isViewingAllCharacters = ref(false) // true для ГМ (все персонажи), false для игрока (свои)
+const selectedVehicle = ref(null)
 
-// Персонажи текущего игрока
-const myCharacters = computed(() => {
-  return charactersStore.getMyCharacters(authStore.user?.uid)
-})
-
-// Все персонажи кампании (для ГМ)
+// Все записи кампании (персонажи + транспорт)
 const allCharacters = computed(() => {
   return charactersStore.characters
 })
@@ -79,15 +78,12 @@ function openCreateCharacterModal() {
   showCreateCharacterModal.value = true
 }
 
-// Показать список своих персонажей (для игрока)
-function openMyCharacters() {
-  isViewingAllCharacters.value = false
-  showCharactersList.value = true
+function openCreateVehicleModal() {
+  showCreateVehicleModal.value = true
 }
 
-// Показать список всех персонажей (для ГМ)
-function openAllCharacters() {
-  isViewingAllCharacters.value = true
+// Показать список всех персонажей и транспорта
+function openCharactersList() {
   showCharactersList.value = true
 }
 
@@ -102,9 +98,21 @@ function selectCharacter(character) {
   showCharactersList.value = false
 }
 
+// Выбрать транспорт для просмотра
+function selectVehicle(vehicle) {
+  selectedVehicle.value = vehicle
+  showVehicleSheet.value = true
+  showCharactersList.value = false
+}
+
 function closeCharacterSheet() {
   showCharacterSheet.value = false
   selectedCharacter.value = null
+}
+
+function closeVehicleSheet() {
+  showVehicleSheet.value = false
+  selectedVehicle.value = null
 }
 
 function goBack() {
@@ -151,7 +159,7 @@ const hasAccess = computed(() => {
         </div>
         <div class="header-info">
           <span class="user-role" :class="{ 'role-gm': userStore.isGM }">
-            {{ userStore.isGM ? '🎭 GM' : '⚔️ Player' }}
+            {{ userStore.isGM ? '🎭 Мастер' : '⚔️ Игрок' }}
           </span>
         </div>
       </header>
@@ -164,8 +172,8 @@ const hasAccess = computed(() => {
           @toggle-map-type="handleMapTypeChange"
           @create-token="openCreateTokenModal"
           @create-character="openCreateCharacterModal"
-          @view-my-characters="openMyCharacters"
-          @view-sheets="openAllCharacters"
+          @create-vehicle="openCreateVehicleModal"
+          @view-characters="openCharactersList"
         />
         
         <!-- Карта (центр) -->
@@ -193,14 +201,21 @@ const hasAccess = computed(() => {
       @close="showCreateCharacterModal = false"
     />
     
-    <!-- Панель списка персонажей -->
+    <!-- Модальное окно создания транспорта -->
+    <CreateVehicleModal 
+      v-if="showCreateVehicleModal"
+      :campaign-id="campaignId"
+      @close="showCreateVehicleModal = false"
+    />
+    
+    <!-- Панель списка персонажей и транспорта -->
     <CharactersList
       :is-open="showCharactersList"
-      :characters="isViewingAllCharacters ? allCharacters : myCharacters"
-      :title="isViewingAllCharacters ? 'Все персонажи' : 'Мои персонажи'"
-      :empty-message="isViewingAllCharacters ? 'Нет персонажей в кампании' : 'У вас нет персонажей'"
+      :characters="allCharacters"
+      :current-user-id="authStore.user?.uid"
       @close="closeCharactersList"
       @select="selectCharacter"
+      @select-vehicle="selectVehicle"
     />
     
     <!-- Лист персонажа -->
@@ -208,10 +223,20 @@ const hasAccess = computed(() => {
       v-if="showCharacterSheet && selectedCharacter"
       :character="selectedCharacter"
       :campaign-id="campaignId"
-      :can-edit="!userStore.isGM && selectedCharacter?.ownerId === authStore.user?.uid"
+      :can-edit="true"
       @close="closeCharacterSheet"
       @updated="closeCharacterSheet"
       @deleted="closeCharacterSheet"
+    />
+    
+    <!-- Лист транспорта -->
+    <VehicleSheet
+      v-if="showVehicleSheet && selectedVehicle"
+      :vehicle="selectedVehicle"
+      :campaign-id="campaignId"
+      @close="closeVehicleSheet"
+      @updated="closeVehicleSheet"
+      @deleted="closeVehicleSheet"
     />
   </div>
 </template>
@@ -375,6 +400,7 @@ const hasAccess = computed(() => {
   
   .chat-panel {
     width: 100%;
+    min-width: unset;
     height: 250px;
   }
 }

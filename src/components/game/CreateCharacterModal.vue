@@ -102,15 +102,15 @@
               </select>
               
               <!-- Способности СТК -->
-              <div v-if="form.stats.stk >= 5" class="stat-abilities">
-                <Tooltip :content="charactersStore.statAbilities.stk[5].description" position="bottom">
+              <div v-if="form.stats.stk >= 4" class="stat-abilities">
+                <Tooltip :content="charactersStore.statAbilities.stk[4].description" position="bottom">
                   <div class="ability-tag small">
-                    ⚔️ {{ charactersStore.statAbilities.stk[5].name }}
+                    ⚔️ {{ charactersStore.statAbilities.stk[4].name }}
                   </div>
                 </Tooltip>
-                <Tooltip v-if="form.stats.stk >= 10" :content="charactersStore.statAbilities.stk[10].description" position="bottom">
+                <Tooltip v-if="form.stats.stk >= 8" :content="charactersStore.statAbilities.stk[8].description" position="bottom">
                   <div class="ability-tag small">
-                    💪 {{ charactersStore.statAbilities.stk[10].name }}
+                    💪 {{ charactersStore.statAbilities.stk[8].name }}
                   </div>
                 </Tooltip>
               </div>
@@ -127,15 +127,15 @@
               </select>
               
               <!-- Способности ЛВК -->
-              <div v-if="form.stats.lvk >= 5" class="stat-abilities">
-                <Tooltip :content="charactersStore.statAbilities.lvk[5].description" position="bottom">
+              <div v-if="form.stats.lvk >= 4" class="stat-abilities">
+                <Tooltip :content="charactersStore.statAbilities.lvk[4].description" position="bottom">
                   <div class="ability-tag small">
-                    🎯 {{ charactersStore.statAbilities.lvk[5].name }}
+                    🎯 {{ charactersStore.statAbilities.lvk[4].name }}
                   </div>
                 </Tooltip>
-                <Tooltip v-if="form.stats.lvk >= 10" :content="charactersStore.statAbilities.lvk[10].description" position="bottom">
+                <Tooltip v-if="form.stats.lvk >= 8" :content="charactersStore.statAbilities.lvk[8].description" position="bottom">
                   <div class="ability-tag small">
-                    🗡️ {{ charactersStore.statAbilities.lvk[10].name }}
+                    🗡️ {{ charactersStore.statAbilities.lvk[8].name }}
                   </div>
                 </Tooltip>
               </div>
@@ -152,20 +152,28 @@
               </select>
               
               <!-- Способности РЗМ -->
-              <div v-if="form.stats.rzm >= 5" class="stat-abilities">
+              <div v-if="form.stats.rzm >= 4" class="stat-abilities">
                 <Tooltip 
-                  v-for="(ability, idx) in charactersStore.statAbilities.rzm[5]" 
-                  :key="idx"
-                  :content="ability.description" 
+                  v-if="form.worldview === 'balance'"
+                  :content="charactersStore.statAbilities.rzm[4].balance.description" 
                   position="bottom"
                 >
                   <div class="ability-tag small">
-                    🔮 {{ ability.name }}
+                    🔮 {{ charactersStore.statAbilities.rzm[4].balance.name }}
                   </div>
                 </Tooltip>
-                <Tooltip v-if="form.stats.rzm >= 10" :content="charactersStore.statAbilities.rzm[10].description" position="bottom">
+                <Tooltip 
+                  v-else
+                  :content="charactersStore.statAbilities.rzm[4].will.description" 
+                  position="bottom"
+                >
                   <div class="ability-tag small">
-                    📚 {{ charactersStore.statAbilities.rzm[10].name }}
+                    🔮 {{ charactersStore.statAbilities.rzm[4].will.name }}
+                  </div>
+                </Tooltip>
+                <Tooltip v-if="form.stats.rzm >= 8" :content="charactersStore.statAbilities.rzm[8].description" position="bottom">
+                  <div class="ability-tag small">
+                    📚 {{ charactersStore.statAbilities.rzm[8].name }}
                   </div>
                 </Tooltip>
               </div>
@@ -182,15 +190,15 @@
               </select>
               
               <!-- Способности ХАР -->
-              <div v-if="form.stats.har >= 5" class="stat-abilities">
-                <Tooltip :content="charactersStore.statAbilities.har[5].description" position="bottom">
+              <div v-if="form.stats.har >= 4" class="stat-abilities">
+                <Tooltip :content="charactersStore.statAbilities.har[4].description" position="bottom">
                   <div class="ability-tag small">
-                    👑 {{ charactersStore.statAbilities.har[5].name }}
+                    👑 {{ charactersStore.statAbilities.har[4].name }}
                   </div>
                 </Tooltip>
-                <Tooltip v-if="form.stats.har >= 10" :content="charactersStore.statAbilities.har[10].description" position="bottom">
+                <Tooltip v-if="form.stats.har >= 8" :content="charactersStore.statAbilities.har[8].description" position="bottom">
                   <div class="ability-tag small">
-                    🎖️ {{ charactersStore.statAbilities.har[10].name }}
+                    🎖️ {{ charactersStore.statAbilities.har[8].name }}
                   </div>
                 </Tooltip>
               </div>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
@@ -9,15 +9,33 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['toggle-map-type', 'create-token', 'create-character', 'view-sheets', 'view-my-characters'])
+const emit = defineEmits(['toggle-map-type', 'create-token', 'create-character', 'create-vehicle', 'view-characters'])
 
 const userStore = useUserStore()
+
+const sidebarRef = ref(null)
 
 // Тип карты: 'global' (гексы) или 'local' (квадраты)
 const mapType = ref('global')
 
 // Показ меню персонажей
 const showCharacterMenu = ref(false)
+
+function handleClickOutside(e) {
+  if (showCharacterMenu.value && sidebarRef.value && !sidebarRef.value.contains(e.target)) {
+    showCharacterMenu.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  document.addEventListener('touchstart', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('touchstart', handleClickOutside)
+})
 
 function toggleMapType() {
   mapType.value = mapType.value === 'global' ? 'local' : 'global'
@@ -28,26 +46,29 @@ function toggleCharacterMenu() {
   showCharacterMenu.value = !showCharacterMenu.value
 }
 
-// Действия персонажей
 function createToken() {
   emit('create-token')
 }
 
-function viewCharacterSheets() {
-  emit('view-sheets')
-}
-
-function viewMyCharacters() {
-  emit('view-my-characters')
+function viewCharacters() {
+  emit('view-characters')
 }
 
 function createCharacter() {
   emit('create-character')
 }
+
+function createVehicle() {
+  emit('create-vehicle')
+}
+
+function openBestiary() {
+  window.open('https://secret-trails.nuxt.dev/bestiary', '_blank')
+}
 </script>
 
 <template>
-  <div class="game-sidebar">
+  <div class="game-sidebar" ref="sidebarRef">
     <!-- Переключатель типа карты -->
     <div class="sidebar-section">
       <button 
@@ -74,29 +95,27 @@ function createCharacter() {
       
       <!-- Подменю персонажей -->
       <div v-if="showCharacterMenu" class="character-menu">
-        <!-- Меню для GM -->
-        <template v-if="userStore.isGM">
-          <button class="menu-item" @click="createToken">
-            <span>✨</span> Создать токен
-          </button>
-          <button class="menu-item" @click="viewCharacterSheets">
-            <span>📋</span> Посмотреть листы
-          </button>
-        </template>
-        
-        <!-- Меню для игрока -->
-        <template v-else>
-          <button class="menu-item" @click="createCharacter">
-            <span>✨</span> Создать персонажа
-          </button>
-          <button class="menu-item" @click="createToken">
-            <span>🎭</span> Создать токен
-          </button>
-          <button class="menu-item" @click="viewMyCharacters">
-            <span>📜</span> Мои персонажи
-          </button>
-        </template>
+        <button v-if="!userStore.isGM" class="menu-item" @click="createCharacter">
+          <span>✨</span> Создать персонажа
+        </button>
+        <button class="menu-item" @click="createVehicle">
+          <span>🐴</span> Создать транспорт
+        </button>
+        <button class="menu-item" @click="createToken">
+          <span>🎭</span> Создать токен
+        </button>
+        <button class="menu-item" @click="viewCharacters">
+          <span>📋</span> Все листы
+        </button>
       </div>
+    </div>
+
+    <!-- Бестиарий (только для мастера) -->
+    <div v-if="userStore.isGM" class="sidebar-section">
+      <button class="bestiary-btn" @click="openBestiary" title="Открыть бестиарий">
+        <span class="btn-icon">📖</span>
+        <span class="btn-label">Бестиарий</span>
+      </button>
     </div>
 
     <!-- Разделитель -->
@@ -105,7 +124,7 @@ function createCharacter() {
     <!-- Информация о кампании -->
     <div class="sidebar-section sidebar-info">
       <div class="info-item">
-        <span class="info-icon">🎭</span>
+        <span class="info-icon">{{ userStore.isGM ? '🎭' : '⚔️' }}</span>
         <span class="info-label">{{ userStore.isGM ? 'Мастер' : 'Игрок' }}</span>
       </div>
     </div>
@@ -197,8 +216,9 @@ function createCharacter() {
   flex-direction: column;
   gap: 0.25rem;
   padding: 0.5rem;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.7);
   border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   animation: slideDown 0.2s ease;
 }
 
@@ -250,8 +270,71 @@ function createCharacter() {
   color: #8892a8;
 }
 
+.bestiary-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 8px;
+  color: #a78bfa;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.bestiary-btn:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
 .info-icon {
   font-size: 0.9rem;
+}
+
+@media (max-width: 900px) {
+  .game-sidebar {
+    flex-direction: row;
+    align-items: center;
+    width: 100% !important;
+    min-width: unset !important;
+    padding: 0.5rem 0.75rem;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar-section {
+    flex-direction: row;
+    align-items: center;
+    position: relative;
+  }
+
+  .map-toggle,
+  .characters-btn {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .character-menu {
+    position: absolute;
+    left: 100%;
+    top: -0.5rem;
+    flex-direction: column;
+    min-width: 190px;
+    z-index: 100;
+    animation: none;
+  }
+
+  .sidebar-divider {
+    width: 1px;
+    height: 24px;
+    margin: 0 0.5rem;
+  }
+
+  .sidebar-info {
+    margin-top: 0;
+    margin-left: auto;
+  }
 }
 </style>
 

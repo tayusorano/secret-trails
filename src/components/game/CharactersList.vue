@@ -1,36 +1,82 @@
 <template>
   <div class="characters-panel" :class="{ open: isOpen }">
     <div class="panel-header">
-      <h3>{{ title }}</h3>
+      <h3>Персонажи</h3>
       <button class="close-panel-btn" @click="$emit('close')">✕</button>
     </div>
     
     <div class="characters-list">
-      <div v-if="characters.length === 0" class="empty-state">
-        <span class="empty-icon">📜</span>
-        <p>{{ emptyMessage }}</p>
+      <!-- Мои персонажи -->
+      <div class="section" v-if="myCharacters.length > 0">
+        <div class="section-label">Мои персонажи</div>
+        <button
+          v-for="char in myCharacters"
+          :key="char.id"
+          class="character-item mine"
+          @click="selectCharacter(char)"
+        >
+          <span class="char-icon">{{ getRaceIcon(char.race) }}</span>
+          <div class="char-info">
+            <span class="char-name">{{ char.name }}</span>
+            <span class="char-details">
+              {{ charactersStore.races[char.race]?.name }} • УР {{ char.level }}
+            </span>
+          </div>
+          <span class="char-arrow">→</span>
+        </button>
       </div>
-      
-      <button
-        v-for="char in characters"
-        :key="char.id"
-        class="character-item"
-        @click="selectCharacter(char)"
-      >
-        <span class="char-icon">{{ getRaceIcon(char.race) }}</span>
-        <div class="char-info">
-          <span class="char-name">{{ char.name }}</span>
-          <span class="char-details">
-            {{ charactersStore.races[char.race]?.name }} • УР {{ char.level }}
-          </span>
-        </div>
-        <span class="char-arrow">→</span>
-      </button>
+
+      <!-- Другие персонажи -->
+      <div class="section" v-if="otherCharacters.length > 0">
+        <div class="section-label">Другие персонажи</div>
+        <button
+          v-for="char in otherCharacters"
+          :key="char.id"
+          class="character-item"
+          @click="selectCharacter(char)"
+        >
+          <span class="char-icon">{{ getRaceIcon(char.race) }}</span>
+          <div class="char-info">
+            <span class="char-name">{{ char.name }}</span>
+            <span class="char-details">
+              {{ charactersStore.races[char.race]?.name }} • УР {{ char.level }}
+            </span>
+          </div>
+          <span class="char-arrow">→</span>
+        </button>
+      </div>
+
+      <!-- Транспорт -->
+      <div class="section" v-if="vehicles.length > 0">
+        <div class="section-label">Транспорт</div>
+        <button
+          v-for="v in vehicles"
+          :key="v.id"
+          class="character-item vehicle"
+          @click="selectVehicle(v)"
+        >
+          <span class="char-icon">💰</span>
+          <div class="char-info">
+            <span class="char-name">{{ v.name }}</span>
+            <span class="char-details">
+              Ячеек: {{ v.inventorySize || 0 }}
+            </span>
+          </div>
+          <span class="char-arrow">→</span>
+        </button>
+      </div>
+
+      <!-- Пусто -->
+      <div v-if="allEmpty" class="empty-state">
+        <span class="empty-icon">📜</span>
+        <p>Нет персонажей в кампании</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useCharactersStore } from '@/stores/characters'
 
 const props = defineProps({
@@ -42,19 +88,35 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
-  title: {
+  currentUserId: {
     type: String,
-    default: 'Персонажи'
-  },
-  emptyMessage: {
-    type: String,
-    default: 'Нет персонажей'
+    default: ''
   }
 })
 
-const emit = defineEmits(['close', 'select'])
+const emit = defineEmits(['close', 'select', 'select-vehicle'])
 
 const charactersStore = useCharactersStore()
+
+const onlyCharacters = computed(() => {
+  return props.characters.filter(c => c.type !== 'vehicle')
+})
+
+const myCharacters = computed(() => {
+  return onlyCharacters.value.filter(c => c.ownerId === props.currentUserId)
+})
+
+const otherCharacters = computed(() => {
+  return onlyCharacters.value.filter(c => c.ownerId !== props.currentUserId)
+})
+
+const vehicles = computed(() => {
+  return props.characters.filter(c => c.type === 'vehicle')
+})
+
+const allEmpty = computed(() => {
+  return myCharacters.value.length === 0 && otherCharacters.value.length === 0 && vehicles.value.length === 0
+})
 
 function getRaceIcon(race) {
   const icons = {
@@ -67,6 +129,10 @@ function getRaceIcon(race) {
 
 function selectCharacter(char) {
   emit('select', char)
+}
+
+function selectVehicle(v) {
+  emit('select-vehicle', v)
 }
 </script>
 
@@ -125,6 +191,21 @@ function selectCharacter(char) {
   padding: 0.75rem;
 }
 
+/* Секции */
+.section {
+  margin-bottom: 1rem;
+}
+
+.section-label {
+  color: #8892a8;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 0.25rem 0.5rem 0.5rem;
+  font-weight: 600;
+}
+
+/* Пустое состояние */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -145,6 +226,7 @@ function selectCharacter(char) {
   margin: 0;
 }
 
+/* Элемент персонажа */
 .character-item {
   display: flex;
   align-items: center;
@@ -163,6 +245,14 @@ function selectCharacter(char) {
 .character-item:hover {
   background: rgba(232, 213, 183, 0.1);
   border-color: rgba(232, 213, 183, 0.2);
+}
+
+.character-item.mine {
+  border-left: 3px solid rgba(232, 213, 183, 0.4);
+}
+
+.character-item.vehicle {
+  border-left: 3px solid rgba(139, 92, 246, 0.4);
 }
 
 .char-icon {
@@ -212,5 +302,3 @@ function selectCharacter(char) {
   }
 }
 </style>
-
-

@@ -33,12 +33,17 @@
               <input v-if="isEditing" v-model="editForm.name" type="text" />
               <span v-else class="info-value">{{ character.name }}</span>
             </div>
-            <div class="info-item">
+            <div 
+              class="info-item" 
+              :class="{ clickable: !isEditing }"
+              @click="!isEditing && rollLevelCheck()"
+            >
               <span class="info-label">УР</span>
-              <select v-if="isEditing" v-model.number="editForm.level">
+              <select v-if="isEditing" v-model.number="editForm.level" @click.stop>
                 <option v-for="n in 10" :key="n" :value="n">{{ n }}</option>
               </select>
               <span v-else class="info-value">{{ character.level }}</span>
+              <span v-if="!isEditing" class="roll-hint-mini">🎲</span>
             </div>
             <div class="info-item">
               <span class="info-label">ОПЫТ</span>
@@ -91,12 +96,12 @@
               </select>
               <span v-else class="stat-value">{{ character.stats?.stk || 0 }}</span>
               <span v-if="canRollStats && !isEditing" class="roll-hint">🎲 Кликни для проверки</span>
-              <div v-if="(isEditing ? editForm.stats.stk : character.stats?.stk) >= 5" class="stat-abilities-list">
-                <Tooltip :content="charactersStore.statAbilities.stk[5].description" position="bottom">
-                  <span class="ability-badge">⚔️ {{ charactersStore.statAbilities.stk[5].name }}</span>
+              <div v-if="(isEditing ? editForm.stats.stk : character.stats?.stk) >= 4" class="stat-abilities-list">
+                <Tooltip :content="charactersStore.statAbilities.stk[4].description" position="bottom">
+                  <span class="ability-badge">⚔️ {{ charactersStore.statAbilities.stk[4].name }}</span>
                 </Tooltip>
-                <Tooltip v-if="(isEditing ? editForm.stats.stk : character.stats?.stk) >= 10" :content="charactersStore.statAbilities.stk[10].description" position="bottom">
-                  <span class="ability-badge">💪 {{ charactersStore.statAbilities.stk[10].name }}</span>
+                <Tooltip v-if="(isEditing ? editForm.stats.stk : character.stats?.stk) >= 8" :content="charactersStore.statAbilities.stk[8].description" position="bottom">
+                  <span class="ability-badge">💪 {{ charactersStore.statAbilities.stk[8].name }}</span>
                 </Tooltip>
               </div>
             </div>
@@ -114,12 +119,12 @@
               </select>
               <span v-else class="stat-value">{{ character.stats?.lvk || 0 }}</span>
               <span v-if="canRollStats && !isEditing" class="roll-hint">🎲 Кликни для проверки</span>
-              <div v-if="(isEditing ? editForm.stats.lvk : character.stats?.lvk) >= 5" class="stat-abilities-list">
-                <Tooltip :content="charactersStore.statAbilities.lvk[5].description" position="bottom">
-                  <span class="ability-badge">🎯 {{ charactersStore.statAbilities.lvk[5].name }}</span>
+              <div v-if="(isEditing ? editForm.stats.lvk : character.stats?.lvk) >= 4" class="stat-abilities-list">
+                <Tooltip :content="charactersStore.statAbilities.lvk[4].description" position="bottom">
+                  <span class="ability-badge">🎯 {{ charactersStore.statAbilities.lvk[4].name }}</span>
                 </Tooltip>
-                <Tooltip v-if="(isEditing ? editForm.stats.lvk : character.stats?.lvk) >= 10" :content="charactersStore.statAbilities.lvk[10].description" position="bottom">
-                  <span class="ability-badge">🗡️ {{ charactersStore.statAbilities.lvk[10].name }}</span>
+                <Tooltip v-if="(isEditing ? editForm.stats.lvk : character.stats?.lvk) >= 8" :content="charactersStore.statAbilities.lvk[8].description" position="bottom">
+                  <span class="ability-badge">🗡️ {{ charactersStore.statAbilities.lvk[8].name }}</span>
                 </Tooltip>
               </div>
             </div>
@@ -137,17 +142,23 @@
               </select>
               <span v-else class="stat-value">{{ character.stats?.rzm || 0 }}</span>
               <span v-if="canRollStats && !isEditing" class="roll-hint">🎲 Кликни для проверки</span>
-              <div v-if="(isEditing ? editForm.stats.rzm : character.stats?.rzm) >= 5" class="stat-abilities-list">
+              <div v-if="(isEditing ? editForm.stats.rzm : character.stats?.rzm) >= 4" class="stat-abilities-list">
                 <Tooltip 
-                  v-for="(ability, idx) in charactersStore.statAbilities.rzm[5]" 
-                  :key="idx"
-                  :content="ability.description" 
+                  v-if="(isEditing ? editForm.worldview : character.worldview) === 'balance'"
+                  :content="charactersStore.statAbilities.rzm[4].balance.description" 
                   position="bottom"
                 >
-                  <span class="ability-badge">🔮 {{ ability.name }}</span>
+                  <span class="ability-badge">🔮 {{ charactersStore.statAbilities.rzm[4].balance.name }}</span>
                 </Tooltip>
-                <Tooltip v-if="(isEditing ? editForm.stats.rzm : character.stats?.rzm) >= 10" :content="charactersStore.statAbilities.rzm[10].description" position="bottom">
-                  <span class="ability-badge">📚 {{ charactersStore.statAbilities.rzm[10].name }}</span>
+                <Tooltip 
+                  v-else
+                  :content="charactersStore.statAbilities.rzm[4].will.description" 
+                  position="bottom"
+                >
+                  <span class="ability-badge">🔮 {{ charactersStore.statAbilities.rzm[4].will.name }}</span>
+                </Tooltip>
+                <Tooltip v-if="(isEditing ? editForm.stats.rzm : character.stats?.rzm) >= 8" :content="charactersStore.statAbilities.rzm[8].description" position="bottom">
+                  <span class="ability-badge">📚 {{ charactersStore.statAbilities.rzm[8].name }}</span>
                 </Tooltip>
               </div>
             </div>
@@ -165,12 +176,12 @@
               </select>
               <span v-else class="stat-value">{{ character.stats?.har || 0 }}</span>
               <span v-if="canRollStats && !isEditing" class="roll-hint">🎲 Кликни для проверки</span>
-              <div v-if="(isEditing ? editForm.stats.har : character.stats?.har) >= 5" class="stat-abilities-list">
-                <Tooltip :content="charactersStore.statAbilities.har[5].description" position="bottom">
-                  <span class="ability-badge">👑 {{ charactersStore.statAbilities.har[5].name }}</span>
+              <div v-if="(isEditing ? editForm.stats.har : character.stats?.har) >= 4" class="stat-abilities-list">
+                <Tooltip :content="charactersStore.statAbilities.har[4].description" position="bottom">
+                  <span class="ability-badge">👑 {{ charactersStore.statAbilities.har[4].name }}</span>
                 </Tooltip>
-                <Tooltip v-if="(isEditing ? editForm.stats.har : character.stats?.har) >= 10" :content="charactersStore.statAbilities.har[10].description" position="bottom">
-                  <span class="ability-badge">🎖️ {{ charactersStore.statAbilities.har[10].name }}</span>
+                <Tooltip v-if="(isEditing ? editForm.stats.har : character.stats?.har) >= 8" :content="charactersStore.statAbilities.har[8].description" position="bottom">
+                  <span class="ability-badge">🎖️ {{ charactersStore.statAbilities.har[8].name }}</span>
                 </Tooltip>
               </div>
             </div>
@@ -281,6 +292,15 @@
                   type="text"
                   :title="editForm.inventory[i-1]"
                 />
+                <Tooltip
+                  v-else-if="spellsStore.findSpell(character.inventory?.[i-1])"
+                  :content="spellsStore.findSpell(character.inventory?.[i-1]).description"
+                  position="bottom"
+                >
+                  <span class="inv-item inv-spell">
+                    ✨ {{ character.inventory?.[i-1] }}
+                  </span>
+                </Tooltip>
                 <span v-else class="inv-item" :title="character.inventory?.[i-1]">
                   {{ character.inventory?.[i-1] || '—' }}
                 </span>
@@ -295,6 +315,15 @@
                   type="text"
                   :title="editForm.inventory[i+9]"
                 />
+                <Tooltip
+                  v-else-if="spellsStore.findSpell(character.inventory?.[i+9])"
+                  :content="spellsStore.findSpell(character.inventory?.[i+9]).description"
+                  position="bottom"
+                >
+                  <span class="inv-item inv-spell">
+                    ✨ {{ character.inventory?.[i+9] }}
+                  </span>
+                </Tooltip>
                 <span v-else class="inv-item" :title="character.inventory?.[i+9]">
                   {{ character.inventory?.[i+9] || '—' }}
                 </span>
@@ -327,11 +356,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useCharactersStore } from '@/stores/characters'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+import { useSpellsStore } from '@/stores/spells'
 import Tooltip from '@/components/ui/Tooltip.vue'
 
 const props = defineProps({
@@ -355,6 +385,11 @@ const charactersStore = useCharactersStore()
 const authStore = useAuthStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const spellsStore = useSpellsStore()
+
+onMounted(() => {
+  spellsStore.fetchSpells()
+})
 
 const isEditing = ref(false)
 const isSaving = ref(false)
@@ -404,6 +439,24 @@ function updateArmorClass() {
 const canRollStats = computed(() => {
   return props.canEdit && !isEditing.value && !userStore.isGM
 })
+
+// Бросок проверки уровня
+async function rollLevelCheck() {
+  if (isEditing.value) return
+  
+  const level = props.character.level || 1
+  const d20 = Math.floor(Math.random() * 20) + 1
+  const total = d20 + level
+  const notation = `1d20+${level} (УР)`
+  const details = `[${d20}] + ${level}`
+  
+  await chatStore.sendDiceRoll(
+    props.campaignId,
+    notation,
+    total,
+    details
+  )
+}
 
 // Бросок проверки характеристики
 async function rollStatCheck(statKey, statName, statValue) {
@@ -512,8 +565,7 @@ async function deleteCharacter() {
   try {
     await charactersStore.deleteCharacter(
       props.campaignId,
-      props.character.id,
-      authStore.user.uid
+      props.character.id
     )
     emit('deleted')
     emit('close')
@@ -643,6 +695,36 @@ async function deleteCharacter() {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
+  position: relative;
+}
+
+.info-item.clickable {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 0.3rem;
+  margin: -0.3rem;
+  transition: all 0.2s;
+}
+
+.info-item.clickable:hover {
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.info-item.clickable:active {
+  transform: scale(0.97);
+}
+
+.roll-hint-mini {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  font-size: 0.65rem;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.info-item.clickable:hover .roll-hint-mini {
+  opacity: 1;
 }
 
 .info-item.wide {
@@ -882,6 +964,16 @@ async function deleteCharacter() {
   word-break: break-word;
   line-height: 1.3;
   min-width: 0;
+}
+
+.inv-spell {
+  color: #a78bfa;
+  cursor: help;
+  transition: color 0.2s;
+}
+
+.inv-spell:hover {
+  color: #c4b5fd;
 }
 
 .penalty-tag {

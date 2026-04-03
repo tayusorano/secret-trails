@@ -32,6 +32,9 @@ const GRID_SIZE_LOCAL = 100  // Местность 100x100 квадратов
 const HEX_SIZE = 40
 const SQUARE_SIZE = 50
 
+// Ориентация гексов: 'flat' (плоская вершина) или 'pointy' (острая вершина)
+const hexOrientation = ref('flat')
+
 // Размер сетки в зависимости от типа карты
 const gridSize = computed(() => isGlobal.value ? GRID_SIZE_GLOBAL : GRID_SIZE_LOCAL)
 
@@ -45,6 +48,7 @@ const mode = ref('pan')
 // 'pen' - кисть
 // 'text' - текст
 // 'eraser' - ластик
+// 'fill' - заливка гекса
 const drawTool = ref('pen')
 const penColor = ref('#000000')
 const penSize = ref(3)
@@ -81,7 +85,11 @@ const mapWrapper = ref(null)
 // Вычисляем размеры карты
 const mapWidth = computed(() => {
   if (isGlobal.value) {
-    return HEX_SIZE * 1.732 * GRID_SIZE_GLOBAL + HEX_SIZE
+    if (hexOrientation.value === 'flat') {
+      return HEX_SIZE * 1.5 * GRID_SIZE_GLOBAL + HEX_SIZE * 2
+    } else {
+      return HEX_SIZE * 1.732 * GRID_SIZE_GLOBAL + HEX_SIZE
+    }
   } else {
     return SQUARE_SIZE * GRID_SIZE_LOCAL
   }
@@ -89,7 +97,11 @@ const mapWidth = computed(() => {
 
 const mapHeight = computed(() => {
   if (isGlobal.value) {
-    return HEX_SIZE * 1.5 * GRID_SIZE_GLOBAL + HEX_SIZE
+    if (hexOrientation.value === 'flat') {
+      return HEX_SIZE * 1.732 * GRID_SIZE_GLOBAL + HEX_SIZE * 1.732
+    } else {
+      return HEX_SIZE * 1.5 * GRID_SIZE_GLOBAL + HEX_SIZE
+    }
   } else {
     return SQUARE_SIZE * GRID_SIZE_LOCAL
   }
@@ -108,12 +120,19 @@ const cells = computed(() => {
 })
 
 function getHexPosition(row, col) {
-  const hexWidth = HEX_SIZE * 1.732
-  const hexHeight = HEX_SIZE * 2
-  const verticalSpacing = hexHeight * 0.75
-  const x = col * hexWidth + (row % 2 === 1 ? hexWidth / 2 : 0) + HEX_SIZE
-  const y = row * verticalSpacing + HEX_SIZE
-  return { x, y }
+  if (hexOrientation.value === 'flat') {
+    const horizontalSpacing = HEX_SIZE * 1.5
+    const hexHeight = HEX_SIZE * 1.732
+    const x = col * horizontalSpacing + HEX_SIZE
+    const y = row * hexHeight + (col % 2 === 1 ? hexHeight / 2 : 0) + HEX_SIZE
+    return { x, y }
+  } else {
+    const hexWidth = HEX_SIZE * 1.732
+    const verticalSpacing = HEX_SIZE * 1.5
+    const x = col * hexWidth + (row % 2 === 1 ? hexWidth / 2 : 0) + HEX_SIZE
+    const y = row * verticalSpacing + HEX_SIZE
+    return { x, y }
+  }
 }
 
 function getSquarePosition(row, col) {
@@ -122,9 +141,43 @@ function getSquarePosition(row, col) {
 
 function getHexPath() {
   const size = HEX_SIZE
-  const w = size * 1.732 / 2
-  const h = size / 2
-  return `M 0 ${-size} L ${w} ${-h} L ${w} ${h} L 0 ${size} L ${-w} ${h} L ${-w} ${-h} Z`
+  if (hexOrientation.value === 'flat') {
+    const h = size * 1.732 / 2
+    return `M ${size} 0 L ${size / 2} ${h} L ${-size / 2} ${h} L ${-size} 0 L ${-size / 2} ${-h} L ${size / 2} ${-h} Z`
+  } else {
+    const w = size * 1.732 / 2
+    const h = size / 2
+    return `M 0 ${-size} L ${w} ${-h} L ${w} ${h} L 0 ${size} L ${-w} ${h} L ${-w} ${-h} Z`
+  }
+}
+
+function toggleHexOrientation() {
+  hexOrientation.value = hexOrientation.value === 'flat' ? 'pointy' : 'flat'
+}
+
+// Заливки гексов — вычисляем карту id→цвет из сохранённых данных
+const hexFillColors = computed(() => {
+  const fills = {}
+  const currentMapType = props.mapType
+  drawingsStore.drawings
+    .filter(d => d.type === 'hexfill' && (d.mapType === currentMapType || !d.mapType))
+    .sort((a, b) => getTimestamp(a) - getTimestamp(b))
+    .forEach(d => {
+      fills[`${d.row}-${d.col}`] = d.color
+    })
+  return fills
+})
+
+async function fillHex(cell) {
+  if (mode.value !== 'draw' || drawTool.value !== 'fill' || !isGlobal.value) return
+  
+  await drawingsStore.saveDrawing(props.campaignId, {
+    type: 'hexfill',
+    row: cell.row,
+    col: cell.col,
+    color: penColor.value,
+    mapType: props.mapType
+  })
 }
 
 const mapTransform = computed(() => {
@@ -141,7 +194,7 @@ function onMouseDown(e) {
     startX.value = e.clientX - translateX.value
     startY.value = e.clientY - translateY.value
     mapContainer.value.style.cursor = 'grabbing'
-  } else if (mode.value === 'draw') {
+  } else if (mode.value === 'draw' && drawTool.value !== 'fill') {
     startDrawing(e)
   }
 }
@@ -170,9 +223,7 @@ function onMouseMove(e) {
 function onMouseUp(e) {
   if (mode.value === 'pan') {
     isDragging.value = false
-    if (mapContainer.value) {
-      mapContainer.value.style.cursor = 'grab'
-    }
+    updateCursor()
   } else if (mode.value === 'draw') {
     stopDrawing(e)
   } else if (mode.value === 'token' && draggingToken.value) {
@@ -223,13 +274,87 @@ function onWheel(e) {
   }
 }
 
+// === TOUCH EVENTS ===
+
+function onTouchStart(e) {
+  if (e.touches.length !== 1) return
+
+  const touch = e.touches[0]
+
+  if (mode.value === 'pan') {
+    e.preventDefault()
+    isDragging.value = true
+    startX.value = touch.clientX - translateX.value
+    startY.value = touch.clientY - translateY.value
+  } else if (mode.value === 'draw' && drawTool.value !== 'fill') {
+    e.preventDefault()
+    startDrawing(e)
+  }
+}
+
+function onTouchMove(e) {
+  if (e.touches.length !== 1) return
+
+  const touch = e.touches[0]
+
+  if (mode.value === 'pan' && isDragging.value) {
+    e.preventDefault()
+    translateX.value = touch.clientX - startX.value
+    translateY.value = touch.clientY - startY.value
+  } else if (mode.value === 'draw' && isDrawing.value) {
+    e.preventDefault()
+    draw(e)
+  } else if (mode.value === 'token' && draggingToken.value) {
+    e.preventDefault()
+    const rect = mapContainer.value.getBoundingClientRect()
+    const x = (touch.clientX - rect.left - translateX.value) / scale.value - tokenOffsetX.value
+    const y = (touch.clientY - rect.top - translateY.value) / scale.value - tokenOffsetY.value
+
+    const token = currentTokens.value.find(t => t.id === draggingToken.value)
+    if (token) {
+      token.x = x
+      token.y = y
+    }
+  }
+}
+
+function onTouchEnd() {
+  if (mode.value === 'pan') {
+    isDragging.value = false
+  } else if (mode.value === 'draw') {
+    stopDrawing()
+  } else if (mode.value === 'token' && draggingToken.value) {
+    const token = currentTokens.value.find(t => t.id === draggingToken.value)
+    if (token) {
+      tokensStore.updateTokenPosition(props.campaignId, token.id, token.x, token.y)
+    }
+    draggingToken.value = null
+  }
+}
+
+function startTokenTouchDrag(e, token) {
+  if (mode.value !== 'token') return
+  e.stopPropagation()
+  e.preventDefault()
+
+  draggingToken.value = token.id
+  const touch = e.touches[0]
+  const rect = mapContainer.value.getBoundingClientRect()
+  const touchX = (touch.clientX - rect.left - translateX.value) / scale.value
+  const touchY = (touch.clientY - rect.top - translateY.value) / scale.value
+
+  tokenOffsetX.value = touchX - token.x
+  tokenOffsetY.value = touchY - token.y
+}
+
 // === РИСОВАНИЕ ===
 
 function getCanvasCoords(e) {
   const rect = drawingCanvas.value.getBoundingClientRect()
-  // Учитываем масштаб и смещение
-  const x = (e.clientX - rect.left) / scale.value
-  const y = (e.clientY - rect.top) / scale.value
+  const clientX = e.touches ? e.touches[0].clientX : (e.changedTouches ? e.changedTouches[0].clientX : e.clientX)
+  const clientY = e.touches ? e.touches[0].clientY : (e.changedTouches ? e.changedTouches[0].clientY : e.clientY)
+  const x = (clientX - rect.left) / scale.value
+  const y = (clientY - rect.top) / scale.value
   return { x, y }
 }
 
@@ -327,7 +452,7 @@ function redrawAll() {
   const currentMapType = props.mapType
   const allItems = [
     ...drawingsStore.drawings
-      .filter(d => d.mapType === currentMapType || !d.mapType) // поддержка старых без mapType
+      .filter(d => d.type !== 'hexfill' && (d.mapType === currentMapType || !d.mapType))
       .map(d => ({ ...d, itemType: 'drawing' })),
     ...drawingsStore.texts
       .filter(t => t.mapType === currentMapType || !t.mapType)
@@ -379,14 +504,17 @@ watch(() => drawingsStore.texts, redrawAll, { deep: true })
 
 function setMode(newMode) {
   mode.value = newMode
-  if (mapContainer.value) {
-    if (newMode === 'pan') {
-      mapContainer.value.style.cursor = 'grab'
-    } else if (newMode === 'draw') {
-      mapContainer.value.style.cursor = 'crosshair'
-    } else {
-      mapContainer.value.style.cursor = 'default'
-    }
+  updateCursor()
+}
+
+function updateCursor() {
+  if (!mapContainer.value) return
+  if (mode.value === 'pan') {
+    mapContainer.value.style.cursor = 'grab'
+  } else if (mode.value === 'draw' && drawTool.value !== 'fill') {
+    mapContainer.value.style.cursor = 'crosshair'
+  } else {
+    mapContainer.value.style.cursor = 'default'
   }
 }
 
@@ -437,6 +565,9 @@ onUnmounted(() => {
   tokensStore.unsubscribeFromTokens()
 })
 
+// Обновляем курсор при смене инструмента рисования
+watch(drawTool, updateCursor)
+
 // При изменении типа карты - перерисовываем
 watch(() => props.mapType, () => {
   nextTick(redrawAll)
@@ -450,6 +581,9 @@ watch(() => props.mapType, () => {
       ref="mapContainer"
       class="map-container"
       @mousedown="onMouseDown"
+      @touchstart="onTouchStart"
+      @touchmove="onTouchMove"
+      @touchend="onTouchEnd"
       @wheel="onWheel"
     >
       <!-- Контейнер с трансформацией -->
@@ -465,8 +599,14 @@ watch(() => props.mapType, () => {
               v-for="cell in cells" 
               :key="cell.id"
               :transform="`translate(${getHexPosition(cell.row, cell.col).x}, ${getHexPosition(cell.row, cell.col).y})`"
+              :class="{ 'hex-fillable': mode === 'draw' && drawTool === 'fill' }"
+              @click.stop="fillHex(cell)"
             >
-              <path :d="getHexPath()" class="cell-path" />
+              <path 
+                :d="getHexPath()" 
+                class="cell-path" 
+                :style="hexFillColors[cell.id] ? { fill: hexFillColors[cell.id] } : {}"
+              />
             </g>
           </template>
           <template v-else>
@@ -486,6 +626,7 @@ watch(() => props.mapType, () => {
         <canvas 
           ref="drawingCanvas"
           class="drawing-canvas"
+          :class="{ 'canvas-active': mode === 'draw' && drawTool !== 'fill' }"
           :width="mapWidth"
           :height="mapHeight"
         />
@@ -505,6 +646,7 @@ watch(() => props.mapType, () => {
             borderColor: token.borderColor
           }"
           @mousedown="startTokenDrag($event, token)"
+          @touchstart="startTokenTouchDrag($event, token)"
         >
           <!-- Кнопка удаления (только в режиме токенов) -->
           <button 
@@ -570,6 +712,14 @@ watch(() => props.mapType, () => {
       >
         🧽
       </button>
+      <button 
+        v-if="isGlobal"
+        :class="{ active: drawTool === 'fill' }" 
+        @click="drawTool = 'fill'"
+        title="Заливка гекса"
+      >
+        💧
+      </button>
       
       <div class="tool-divider"></div>
       
@@ -582,7 +732,7 @@ watch(() => props.mapType, () => {
       />
       
       <!-- Размер кисти (для pen и eraser) -->
-      <div v-if="drawTool !== 'text'" class="size-control">
+      <div v-if="drawTool === 'pen' || drawTool === 'eraser'" class="size-control">
         <input 
           type="range" 
           v-model="penSize" 
@@ -595,7 +745,7 @@ watch(() => props.mapType, () => {
       </div>
       
       <!-- Размер шрифта (для text) -->
-      <div v-else class="size-control">
+      <div v-if="drawTool === 'text'" class="size-control">
         <input 
           type="range" 
           v-model="fontSize" 
@@ -632,6 +782,25 @@ watch(() => props.mapType, () => {
     <div class="map-type-indicator">
       {{ isGlobal ? '🌍 Глобальная' : '🗺️ Местность' }}
     </div>
+    
+    <!-- Переключатель ориентации гексов (только для ГМ на глобальной карте) -->
+    <button 
+      v-if="isGlobal && userStore.isGM"
+      class="hex-orientation-toggle"
+      @click="toggleHexOrientation"
+      :title="hexOrientation === 'flat' ? 'Плоская вершина → Острая вершина' : 'Острая вершина → Плоская вершина'"
+    >
+      <svg width="22" height="22" viewBox="-14 -14 28 28">
+        <path 
+          :d="hexOrientation === 'flat' 
+            ? 'M 12 0 L 6 10.4 L -6 10.4 L -12 0 L -6 -10.4 L 6 -10.4 Z' 
+            : 'M 0 -12 L 10.4 -6 L 10.4 6 L 0 12 L -10.4 6 L -10.4 -6 Z'"
+          fill="rgba(232, 213, 183, 0.15)"
+          stroke="currentColor"
+          stroke-width="1.5"
+        />
+      </svg>
+    </button>
   </div>
 </template>
 
@@ -651,6 +820,7 @@ watch(() => props.mapType, () => {
   overflow: hidden;
   cursor: grab;
   position: relative;
+  touch-action: none;
 }
 
 .map-transform {
@@ -672,8 +842,7 @@ watch(() => props.mapType, () => {
   pointer-events: none;
 }
 
-/* Когда режим рисования - canvas перехватывает события */
-.game-map-wrapper:has(.mode-panel button.active:nth-child(3)) .drawing-canvas {
+.drawing-canvas.canvas-active {
   pointer-events: auto;
 }
 
@@ -682,6 +851,16 @@ watch(() => props.mapType, () => {
   fill: #ffffff;
   stroke: #333333;
   stroke-width: 1;
+}
+
+.hex-fillable {
+  cursor: pointer;
+}
+
+.hex-fillable:hover .cell-path {
+  stroke: #a78bfa;
+  stroke-width: 2.5;
+  filter: brightness(0.92);
 }
 
 /* Токены */
@@ -964,5 +1143,30 @@ watch(() => props.mapType, () => {
   color: #e8d5b7;
   font-size: 0.85rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Переключатель ориентации гексов */
+.hex-orientation-toggle {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 26, 46, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #e8d5b7;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.hex-orientation-toggle:hover {
+  background: rgba(26, 26, 46, 1);
+  border-color: #e8d5b7;
 }
 </style>
