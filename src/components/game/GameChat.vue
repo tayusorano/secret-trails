@@ -39,33 +39,53 @@ function rollDice(count, sides) {
   return { rolls, total }
 }
 
-// Парсинг нотации кубиков (например "2d6" или "1d20")
+// Парсинг нотации кубиков (например "2d6", "1d20+5", "2d6-1")
 function parseDiceNotation(notation) {
-  const match = notation.toLowerCase().match(/^(\d+)d(\d+)$/)
+  const match = notation.toLowerCase().match(/^(\d+)d(\d+)(?:([+-])(\d+))?$/)
   if (!match) return null
   
   const count = parseInt(match[1])
   const sides = parseInt(match[2])
+  const modSign = match[3] || null
+  const modValue = match[4] ? parseInt(match[4]) : 0
+  const modifier = modSign === '-' ? -modValue : modValue
   
-  // Ограничения
   if (count < 1 || count > 100) return null
   if (![2, 4, 6, 8, 10, 12, 20, 100].includes(sides)) return null
   
-  return { count, sides }
+  return { count, sides, modifier }
 }
 
-// Быстрый бросок по кнопке
+// Быстрый бросок по кнопке (сразу отправляет)
 async function quickRoll(notation) {
   const parsed = parseDiceNotation(notation)
   if (!parsed) return
-  
+  await executeRoll(notation, parsed)
+}
+
+// Вставить команду в поле ввода (не отправлять)
+function insertDiceCommand(text) {
+  messageInput.value = text
+}
+
+// Выполнить бросок с учётом модификатора
+async function executeRoll(notation, parsed) {
   const { rolls, total } = rollDice(parsed.count, parsed.sides)
-  const details = rolls.length > 1 ? `[${rolls.join(' + ')}]` : ''
+  const finalTotal = total + parsed.modifier
+  
+  let details = ''
+  if (rolls.length > 1 && parsed.modifier) {
+    details = `[${rolls.join(' + ')}] ${parsed.modifier > 0 ? '+' : ''}${parsed.modifier}`
+  } else if (rolls.length > 1) {
+    details = `[${rolls.join(' + ')}]`
+  } else if (parsed.modifier) {
+    details = `[${rolls[0]}] ${parsed.modifier > 0 ? '+' : ''}${parsed.modifier}`
+  }
   
   await chatStore.sendDiceRoll(
     props.campaignId,
     notation,
-    total,
+    finalTotal,
     details
   )
 }
@@ -81,18 +101,9 @@ async function sendMessage() {
     const parsed = parseDiceNotation(notation)
     
     if (parsed) {
-      const { rolls, total } = rollDice(parsed.count, parsed.sides)
-      const details = rolls.length > 1 ? `[${rolls.join(' + ')}]` : ''
-      
-      await chatStore.sendDiceRoll(
-        props.campaignId,
-        notation,
-        total,
-        details
-      )
+      await executeRoll(notation, parsed)
     } else {
-      // Неверный формат - отправляем как обычное сообщение с подсказкой
-      await chatStore.sendMessage(props.campaignId, `❌ Неверный формат. Используй: /roll XdY (например /roll 2d6)`)
+      await chatStore.sendMessage(props.campaignId, `❌ Неверный формат. Используй: /roll XdY+Z (например /roll 2d6+3)`)
     }
     
     messageInput.value = ''
@@ -187,7 +198,7 @@ function getMessageClass(message) {
         </button>
       </div>
       <div class="dice-hint">
-        Или напиши <code>/roll 2d6</code> в чате
+        Или напиши <code class="clickable-hint" @click="insertDiceCommand('/roll 1d6')">/roll 1d6</code> в чате
       </div>
     </div>
     
@@ -204,7 +215,7 @@ function getMessageClass(message) {
       <input 
         v-model="messageInput"
         type="text"
-        placeholder="Сообщение или /roll 2d6..."
+        placeholder="Сообщение или /roll 2d6+3..."
         maxlength="500"
       />
       <button type="submit" :disabled="!messageInput.trim()">
@@ -441,6 +452,16 @@ function getMessageClass(message) {
   padding: 0.1rem 0.3rem;
   border-radius: 3px;
   color: #e8d5b7;
+}
+
+.dice-hint .clickable-hint {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dice-hint .clickable-hint:hover {
+  background: rgba(234, 179, 8, 0.3);
+  color: #fbbf24;
 }
 
 /* Результат броска */
