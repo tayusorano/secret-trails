@@ -41,7 +41,7 @@ export const useSpellsStore = defineStore('spells', () => {
         .filter(row => row[nameIdx])
         .map(row => ({
           name: (row[nameIdx] || '').trim(),
-          description: (row[descIdx] || '').trim()
+          description: (row[descIdx] || '').trim().replace(/\n/g, '<br>')
         }))
 
       spells.value = parsed

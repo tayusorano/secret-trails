@@ -56,6 +56,15 @@
                 :placeholder="'Ячейка ' + i"
                 :title="editForm.inventory[i-1]"
               />
+              <Tooltip
+                v-else-if="spellsStore.findSpell(vehicle.inventory?.[i-1])"
+                :content="spellsStore.findSpell(vehicle.inventory?.[i-1]).description"
+                position="top"
+              >
+                <span class="inv-item inv-spell">
+                  ✨ {{ vehicle.inventory?.[i-1] }}
+                </span>
+              </Tooltip>
               <span v-else class="inv-item" :title="vehicle.inventory?.[i-1]">
                 {{ vehicle.inventory?.[i-1] || '—' }}
               </span>
@@ -78,9 +87,11 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useCharactersStore } from '@/stores/characters'
 import { useAuthStore } from '@/stores/auth'
+import { useSpellsStore } from '@/stores/spells'
+import Tooltip from '@/components/ui/Tooltip.vue'
 
 const props = defineProps({
   vehicle: {
@@ -97,6 +108,11 @@ const emit = defineEmits(['close', 'updated', 'deleted'])
 
 const charactersStore = useCharactersStore()
 const authStore = useAuthStore()
+const spellsStore = useSpellsStore()
+
+onMounted(() => {
+  spellsStore.fetchSpells()
+})
 
 const isEditing = ref(false)
 const isSaving = ref(false)
@@ -344,6 +360,11 @@ async function deleteVehicle() {
   word-break: break-word;
   line-height: 1.3;
   min-width: 0;
+}
+
+.inv-spell {
+  color: #a78bfa;
+  cursor: pointer;
 }
 
 /* Редактирование */

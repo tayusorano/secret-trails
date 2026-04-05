@@ -1,21 +1,29 @@
 <template>
-  <div class="tooltip-wrapper" @mouseenter="show = true" @mouseleave="show = false">
+  <div 
+    class="tooltip-wrapper" 
+    ref="wrapperRef"
+    @mouseenter="onShow" 
+    @mouseleave="show = false"
+    @touchstart.passive="onShow"
+  >
     <slot></slot>
-    <Transition name="tooltip-fade">
-      <div 
-        v-if="show" 
-        class="tooltip-content"
-        :class="[position]"
-        v-html="content"
-      ></div>
-    </Transition>
+    <Teleport to="body">
+      <Transition name="tooltip-fade">
+        <div 
+          v-if="show" 
+          class="tooltip-content"
+          :style="tooltipStyle"
+          v-html="content"
+        ></div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
-defineProps({
+const props = defineProps({
   content: {
     type: String,
     required: true
@@ -28,6 +36,48 @@ defineProps({
 })
 
 const show = ref(false)
+const wrapperRef = ref(null)
+const rect = ref({ top: 0, left: 0, width: 0, height: 0 })
+
+function onShow() {
+  if (wrapperRef.value) {
+    rect.value = wrapperRef.value.getBoundingClientRect()
+  }
+  show.value = true
+}
+
+const tooltipStyle = computed(() => {
+  const r = rect.value
+  const gap = 8
+
+  if (props.position === 'bottom') {
+    return {
+      top: `${r.bottom + gap}px`,
+      left: `${r.left + r.width / 2}px`,
+      transform: 'translateX(-50%)'
+    }
+  }
+  if (props.position === 'left') {
+    return {
+      top: `${r.top + r.height / 2}px`,
+      right: `${window.innerWidth - r.left + gap}px`,
+      transform: 'translateY(-50%)'
+    }
+  }
+  if (props.position === 'right') {
+    return {
+      top: `${r.top + r.height / 2}px`,
+      left: `${r.right + gap}px`,
+      transform: 'translateY(-50%)'
+    }
+  }
+  // top (default)
+  return {
+    bottom: `${window.innerHeight - r.top + gap}px`,
+    left: `${r.left + r.width / 2}px`,
+    transform: 'translateX(-50%)'
+  }
+})
 </script>
 
 <style scoped>
@@ -35,10 +85,12 @@ const show = ref(false)
   position: relative;
   display: inline-flex;
 }
+</style>
 
+<style>
 .tooltip-content {
-  position: absolute;
-  z-index: 1000;
+  position: fixed;
+  z-index: 99999;
   min-width: 200px;
   max-width: 350px;
   padding: 0.75rem 1rem;
@@ -52,80 +104,26 @@ const show = ref(false)
   pointer-events: none;
 }
 
-/* Позиции */
-.tooltip-content.top {
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.tooltip-content.bottom {
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.tooltip-content.left {
-  right: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.tooltip-content.right {
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-/* Стрелки */
-.tooltip-content::before {
-  content: '';
-  position: absolute;
-  border: 6px solid transparent;
-}
-
-.tooltip-content.top::before {
-  bottom: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-top-color: rgba(232, 213, 183, 0.3);
-}
-
-.tooltip-content.bottom::before {
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-bottom-color: rgba(232, 213, 183, 0.3);
-}
-
-/* Стили для HTML внутри tooltip */
-.tooltip-content :deep(b),
-.tooltip-content :deep(strong) {
+.tooltip-content b,
+.tooltip-content strong {
   color: #a78bfa;
   font-weight: 600;
 }
 
-.tooltip-content :deep(i),
-.tooltip-content :deep(em) {
+.tooltip-content i,
+.tooltip-content em {
   color: #e8d5b7;
   font-style: italic;
 }
 
-/* Анимация */
 .tooltip-fade-enter-active,
 .tooltip-fade-leave-active {
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
 .tooltip-fade-enter-from,
 .tooltip-fade-leave-to {
   opacity: 0;
-  transform: translateX(-50%) translateY(4px);
-}
-
-.tooltip-content.bottom.tooltip-fade-enter-from,
-.tooltip-content.bottom.tooltip-fade-leave-to {
-  transform: translateX(-50%) translateY(-4px);
 }
 </style>
 
